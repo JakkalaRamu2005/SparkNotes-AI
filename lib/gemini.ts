@@ -1,10 +1,6 @@
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
-const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY!
-});
-
-export const model = ai.models;
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
 export interface SummarizationOptions {
   maxLength?: number
@@ -12,10 +8,8 @@ export interface SummarizationOptions {
   focus?: string
 }
 
-
-
 export const summarizeText = async (
-  text: string, 
+  text: string,
   options: SummarizationOptions = {}
 ): Promise<{ summary: string; keyPoints: string[] }> => {
   const { maxLength = 500, style = 'concise', focus } = options
@@ -34,12 +28,11 @@ export const summarizeText = async (
   ${text}`
 
   try {
-    const response = await model.generateContent({
-      model: "gemini-2.5-flash",
-      contents: prompt,
-    });
-    
-    const responseText = response.text;
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
+    const result = await model.generateContent(prompt);
+    const response = result.response;
+    const responseText = response.text();
+
     if (!responseText) throw new Error('No response from Gemini')
 
     // Clean up the response to extract JSON
@@ -64,26 +57,19 @@ export const extractTextFromImage = async (imageFile: File): Promise<string> => 
     // Convert file to base64
     const arrayBuffer = await imageFile.arrayBuffer()
     const base64 = Buffer.from(arrayBuffer).toString('base64')
-    
-    const response = await model.generateContent({
-      model: "gemini-2.0-flash-thinking-exp",
-      contents: [
-        {
-          role: "user",
-          parts: [
-            { text: 'Extract all text content from this image. Return only the text, no additional commentary.' },
-            {
-              inlineData: {
-                data: base64,
-                mimeType: imageFile.type
-              }
-            }
-          ]
-        }
-      ]
-    });
 
-    return response.text || ''
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
+    const result = await model.generateContent([
+      {
+        inlineData: {
+          data: base64,
+          mimeType: imageFile.type
+        }
+      },
+      { text: 'Extract all text content from this image. Return only the text, no additional commentary.' }
+    ]);
+
+    return result.response.text() || ''
   } catch (error) {
     console.error('Gemini image text extraction error:', error)
     throw new Error('Failed to extract text from image')
@@ -95,30 +81,23 @@ export const transcribeAudio = async (audioFile: File): Promise<string> => {
     // Convert file to base64
     const arrayBuffer = await audioFile.arrayBuffer()
     const base64 = Buffer.from(arrayBuffer).toString('base64')
-    
-    const response = await model.generateContent({
-      model: "gemini-2.0-flash-thinking-exp",
-      contents: [
-        {
-          role: "user",
-          parts: [
-            { text: 'Transcribe the audio content from this file. Return only the transcribed text, no additional commentary.' },
-            {
-              inlineData: {
-                data: base64,
-                mimeType: audioFile.type
-              }
-            }
-          ]
-        }
-      ]
-    });
 
-    return response.text || ''
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
+    const result = await model.generateContent([
+      {
+        inlineData: {
+          data: base64,
+          mimeType: audioFile.type
+        }
+      },
+      { text: 'Transcribe the audio content from this file. Return only the transcribed text, no additional commentary.' }
+    ]);
+
+    return result.response.text() || ''
   } catch (error) {
     console.error('Gemini audio transcription error:', error)
     throw new Error('Failed to transcribe audio')
   }
 }
 
-export default { model, summarizeText, extractTextFromImage, transcribeAudio }
+export default { summarizeText, extractTextFromImage, transcribeAudio }

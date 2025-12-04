@@ -12,10 +12,42 @@ export default function TextInputBox() {
     if (!text.trim()) return
 
     setIsProcessing(true)
-    // TODO: Implement text processing
-    setTimeout(() => {
+
+    try {
+      const response = await fetch('/api/summarize', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          text: text,
+          title: 'Text Summary',
+          contentType: 'text',
+          options: {
+            style: 'detailed',
+            maxLength: 500
+          }
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to generate summary')
+      }
+
+      // Redirect to summary page
+      if (data.success && data.data?.id) {
+        window.location.href = `/summary/${data.data.id}`
+      } else {
+        alert('Summary generated but no ID returned')
+      }
+    } catch (error) {
+      console.error('Error:', error)
+      alert(error instanceof Error ? error.message : 'Failed to generate summary')
+    } finally {
       setIsProcessing(false)
-    }, 2000)
+    }
   }
 
   const wordCount = text.trim().split(/\s+/).filter(word => word.length > 0).length
@@ -40,7 +72,7 @@ export default function TextInputBox() {
           <FileText className="h-4 w-4 mr-1" />
           <span>Max 50,000 characters</span>
         </div>
-        
+
         <button
           type="submit"
           disabled={!text.trim() || isProcessing}
